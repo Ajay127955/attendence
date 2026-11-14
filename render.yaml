@@ -1,0 +1,91 @@
+# Render Blueprint — one-click deploy of the Attendance Management System.
+#
+# Single free Web Service that serves BOTH the built React SPA (at /attendence/)
+# and the REST API (at /api/v1), backed by a free MongoDB Atlas M0 cluster.
+#
+# How to use:
+#   1. Push this repo to GitHub (see DEPLOY.md Step 0).
+#   2. Create the free Atlas cluster + database user (DEPLOY.md Step 1).
+#   3. Render Dashboard -> New -> Blueprint -> pick this repo.
+#      Render reads this file, creates the service, and prompts you only for the
+#      values marked `sync: false` (the Atlas connection string).
+#   4. Add the custom domain codestorm.dpdns.org (DEPLOY.md Step 3).
+#
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: ams
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /health
+    # --include=dev is REQUIRED: NODE_ENV=production is present during the build,
+    # which would otherwise make `npm ci` skip Vite/Tailwind and fail the SPA build.
+    buildCommand: cd client && npm ci --include=dev && npm run build && cd ../server && npm ci --omit=dev
+    startCommand: node server/src/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # --- Database (set in the Render dashboard; keep secret) ---
+      # mongodb+srv://ams_user:<password>@cluster0.xxxxx.mongodb.net/attendance_ams?retryWrites=true&w=majority
+      - key: MONGODB_URI
+        sync: false
+
+      # --- Auth secrets (auto-generated once, then kept stable) ---
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+
+      # --- Single-origin URL + CORS ---
+      - key: CLIENT_URL
+        value: https://codestorm.dpdns.org
+      - key: CORS_ORIGINS
+        value: https://codestorm.dpdns.org
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: COOKIE_SAME_SITE
+        value: lax
+      - key: COOKIE_DOMAIN
+        value: ""
+
+      # --- Serve the built SPA from the same server at /attendence/ ---
+      - key: SERVE_CLIENT
+        value: "true"
+      - key: CLIENT_BASE_PATH
+        value: /attendence/
+      # Read at BUILD time by Vite, so it must be set before the first build.
+      - key: VITE_BASE_PATH
+        value: /attendence/
+
+      # --- Demo seed credentials (used by `npm run seed`) ---
+      - key: SEED_ADMIN_EMAIL
+        value: admin@ams.dev
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      - key: SEED_TEACHER_PASSWORD
+        sync: false
+      - key: SEED_STUDENT_PASSWORD
+        sync: false
+
+      # --- Optional integrations (leave blank to disable) ---
+      - key: SMTP_HOST
+        value: ""
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        value: ""
+      - key: SMTP_PASS
+        value: ""
+      - key: GOOGLE_SHEETS_ENABLED
+        value: "false"
+      - key: GOOGLE_SHEETS_ID
+        value: ""
+      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
+        value: ""
+      - key: GOOGLE_PRIVATE_KEY
+        value: ""

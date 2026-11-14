@@ -61,6 +61,13 @@ git push -u origin main
 
 ## Step 2 — Deploy the server + app on Render (free)
 
+> **Fastest path (Blueprint):** the repo already contains **`render.yaml`**.
+> In Render choose **New → Blueprint**, pick your `attendence` repo, and Render
+> creates the service and pre-fills everything below. You only type the two
+> prompted secrets (`MONGODB_URI` and the three `SEED_*` passwords). Skip to
+> [Step 3](#step-3--point-your-domain-at-render) once it finishes building.
+> The manual steps below are the equivalent if you'd rather do it by hand.
+
 1. Sign up at <https://render.com> with your GitHub account.
 2. **New** → **Web Service** → connect your `attendence` repository.
 3. Configure:
@@ -72,7 +79,7 @@ git push -u origin main
    | **Branch** | `main` |
    | **Root Directory** | *(leave empty — repo root)* |
    | **Runtime** | Node |
-   | **Build Command** | `cd client && npm ci && npm run build && cd ../server && npm ci` |
+   | **Build Command** | `cd client && npm ci --include=dev && npm run build && cd ../server && npm ci --omit=dev` |
    | **Start Command** | `node server/src/server.js` |
    | **Health Check Path** | `/health` |
    | **Instance Type** | **Free** |
@@ -103,17 +110,36 @@ git push -u origin main
    > `VITE_BASE_PATH` is read at **build time**, so it must be set before the
    > first deploy. `VITE_API_URL` must stay **unset** — the API is same-origin.
    > Leave `SMTP_*` and `GOOGLE_*` blank unless you want those features.
+   >
+   > **Why `--include=dev` in the build command?** Render injects your
+   > environment variables during the build too, so `NODE_ENV=production` is
+   > already set — and plain `npm ci` would then skip `devDependencies`, which
+   > is where Vite and Tailwind live, failing the client build. `--include=dev`
+   > forces them in for the build only; `--omit=dev` keeps the server install lean.
 
 5. **Create Web Service**. Wait for the build to finish, then open the
    `*.onrender.com` URL — you should see the app at `/attendence/`.
 
-6. **Seed the demo data**: in Render, open your service → **Shell** tab and run:
+6. **Seed the demo data**, either:
 
-   ```bash
-   cd server && npm run seed
-   ```
+   - **In Render:** open your service → **Shell** tab and run:
 
-   It prints the demo credentials. (Run it only once — it clears collections.)
+     ```bash
+     cd server && npm run seed
+     ```
+
+   - **From your own machine** (works even if the Shell tab is unavailable on
+     the free tier) — point it at the Atlas database:
+
+     ```powershell
+     cd server
+     $env:MONGODB_URI="mongodb+srv://ams_user:YOUR_PASSWORD@cluster0.xxxxx.mongodb.net/attendance_ams?retryWrites=true&w=majority"
+     $env:SEED_ADMIN_PASSWORD="Admin@12345"; $env:SEED_TEACHER_PASSWORD="Teacher@12345"; $env:SEED_STUDENT_PASSWORD="Student@12345"
+     npm run seed
+     ```
+
+   Either way it prints the demo credentials. (Run it only once — it clears
+   collections.)
 
 ---
 
