@@ -3,11 +3,15 @@
 # Topology (free tier):
 #   Portfolio (Vercel)  : https://codestorm.dpdns.org
 #   App SPA (Vercel)    : https://codestorm.dpdns.org/attendence/
-#   API + WebSockets    : https://attendence.codestorm.dpdns.org  <- this service
+#   API + WebSockets    : this service, reached same-origin through the
+#                         portfolio's Vercel rewrite at https://codestorm.dpdns.org/ams/*
 #   Database            : MongoDB Atlas M0 (free)
 #
-# The same server can also serve its own copy of the SPA at its root, so the
-# subdomain works standalone too.
+# The API is proxied by Vercel under /ams/* (see the portfolio's vercel.json),
+# so the browser talks to the same origin as the SPA and the login cookie is
+# sent normally — no subdomain, and no CORS/cookie workarounds needed. Socket.IO
+# works over its polling transport, since Vercel does not forward WebSocket
+# upgrades for external rewrites.
 #
 # How to use:
 #   1. Push this repo to GitHub (see DEPLOY.md Step 0).
@@ -15,7 +19,7 @@
 #   3. Render Dashboard -> New -> Blueprint -> pick this repo.
 #      Render reads this file, creates the service, and prompts you only for the
 #      values marked `sync: false` (the Atlas connection string).
-#   4. Add the custom domain attendence.codestorm.dpdns.org (DEPLOY.md Step 3).
+#   4. No custom domain is needed: the portfolio proxies /ams/* to this service.
 #
 # Docs: https://render.com/docs/blueprint-spec
 
@@ -51,13 +55,14 @@ services:
 
       # --- Public app URL + CORS ---
       # The SPA is served by the portfolio (Vercel) at
-      # https://codestorm.dpdns.org/attendence/ and talks to this API at
-      # https://attendence.codestorm.dpdns.org. Both origins are allow-listed:
-      # the first is the public app, the second is this service's own copy.
+      # https://codestorm.dpdns.org/attendence/ and reaches this API through the
+      # portfolio's same-origin /ams/* rewrite, so proxied requests carry this
+      # origin. Requests made directly against this service's own URL are
+      # same-origin and therefore need no CORS entry.
       - key: CLIENT_URL
         value: https://codestorm.dpdns.org/attendence
       - key: CORS_ORIGINS
-        value: https://codestorm.dpdns.org,https://attendence.codestorm.dpdns.org
+        value: https://codestorm.dpdns.org
       - key: COOKIE_SECURE
         value: "true"
       - key: COOKIE_SAME_SITE

@@ -52,7 +52,12 @@ export function connectSocket() {
   if (socket) socket.disconnect();
   socket = io(socketOrigin(), {
     path: '/socket.io',
-    transports: ['websocket', 'polling'],
+    // Polling only: the app is served behind the portfolio's same-origin proxy
+    // (Vercel), which does not forward WebSocket upgrades. A websocket-first
+    // list fails to connect, and polling-first still logs a failed upgrade, so
+    // stay on the always-working polling transport. Switch back to
+    // ['websocket', 'polling'] if the API is ever exposed on its own host.
+    transports: ['polling'],
     auth: { token },
     withCredentials: true,
     reconnectionAttempts: 5,
