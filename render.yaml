@@ -18,7 +18,9 @@ services:
     name: ams
     runtime: node
     plan: free
-    region: oregon
+    # Closest region to you. Options: oregon | ohio | virginia | frankfurt | singapore.
+    # If you're in the US, switch this to oregon/ohio/virginia.
+    region: singapore
     branch: main
     autoDeploy: true
     healthCheckPath: /health
