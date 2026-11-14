@@ -127,6 +127,12 @@ if (env.serveClient) {
   } else {
     app.use(env.clientBasePath, express.static(env.clientDist, { index: false, maxAge: '1h' }));
 
+    // Friendly root: visiting https://host/ forwards to the app path
+    // (e.g. / -> /attendence/) instead of returning the API's 404 JSON.
+    if (env.clientBasePath !== '/') {
+      app.get('/', (_req, res) => res.redirect(302, env.clientBasePath));
+    }
+
     // SPA fallback: unknown GETs under the base path return index.html so
     // client-side routes (e.g. /attendence/students) deep-link correctly.
     app.get(`${env.clientBasePath}*`, (req, res, next) => {
