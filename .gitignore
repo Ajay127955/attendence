@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+build/
+client/dist/
+coverage/
+
+# Env
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editors / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Misc
+.cache/
+.tmp/
+tmp/
+uploads/
+*.pem
+.mongodb-binaries/
+.mongo-data/
+
+# Generated QR helpers (contain machine-/tunnel-specific URLs)
+scripts/lan-qr.html
+scripts/tunnel-qr.html

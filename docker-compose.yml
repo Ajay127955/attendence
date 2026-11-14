@@ -1,0 +1,74 @@
+# ─────────────────────────────────────────────────────────────
+# Attendance Management System — full local stack
+#   docker compose up --build
+#   → client  http://localhost:8080
+#   → server  http://localhost:5000  (docs at /api/docs)
+#   → mongo   mongodb://localhost:27017
+#
+# The Nginx front-end proxies /api and /socket.io to the API container, so the
+# browser talks to a single origin and cookie-based auth works out of the box.
+# Change the JWT secrets before exposing this to anyone.
+# ─────────────────────────────────────────────────────────────
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  server:
+    build:
+      context: ./server
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: '5000'
+      API_PREFIX: /api/v1
+      CLIENT_URL: http://localhost:8080
+      CORS_ORIGINS: http://localhost:8080
+      MONGODB_URI: mongodb://mongo:27017/attendance_ams
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-change-me-access-secret-change-me-access}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-refresh-secret-change-me-refresh}
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      COOKIE_SECURE: 'false'
+      COOKIE_SAME_SITE: lax
+      RATE_LIMIT_MAX: '300'
+      AUTH_RATE_LIMIT_MAX: '20'
+    ports:
+      - '5000:5000'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:5000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  client:
+    build:
+      context: ./client
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - '8080:80'
+
+volumes:
+  mongo-data:
