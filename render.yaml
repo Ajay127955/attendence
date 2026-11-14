@@ -1,7 +1,7 @@
 # Render Blueprint — one-click deploy of the Attendance Management System.
 #
-# Single free Web Service that serves BOTH the built React SPA (at /attendence/)
-# and the REST API (at /api/v1), backed by a free MongoDB Atlas M0 cluster.
+# Single free Web Service that serves BOTH the built React SPA (at the site
+# root) and the REST API (at /api/v1), backed by a free MongoDB Atlas M0 cluster.
 #
 # How to use:
 #   1. Push this repo to GitHub (see DEPLOY.md Step 0).
@@ -9,7 +9,7 @@
 #   3. Render Dashboard -> New -> Blueprint -> pick this repo.
 #      Render reads this file, creates the service, and prompts you only for the
 #      values marked `sync: false` (the Atlas connection string).
-#   4. Add the custom domain codestorm.dpdns.org (DEPLOY.md Step 3).
+#   4. Add the custom domain attendence.codestorm.dpdns.org (DEPLOY.md Step 3).
 #
 # Docs: https://render.com/docs/blueprint-spec
 
@@ -44,10 +44,11 @@ services:
         generateValue: true
 
       # --- Single-origin URL + CORS ---
+      # The app lives on its own subdomain; the portfolio keeps codestorm.dpdns.org.
       - key: CLIENT_URL
-        value: https://codestorm.dpdns.org
+        value: https://attendence.codestorm.dpdns.org
       - key: CORS_ORIGINS
-        value: https://codestorm.dpdns.org
+        value: https://attendence.codestorm.dpdns.org
       - key: COOKIE_SECURE
         value: "true"
       - key: COOKIE_SAME_SITE
@@ -55,14 +56,14 @@ services:
       - key: COOKIE_DOMAIN
         value: ""
 
-      # --- Serve the built SPA from the same server at /attendence/ ---
+      # --- Serve the built SPA from this server at the subdomain root ---
       - key: SERVE_CLIENT
         value: "true"
       - key: CLIENT_BASE_PATH
-        value: /attendence/
+        value: /
       # Read at BUILD time by Vite, so it must be set before the first build.
       - key: VITE_BASE_PATH
-        value: /attendence/
+        value: /
 
       # --- Demo seed credentials (used by `npm run seed`) ---
       - key: SEED_ADMIN_EMAIL
