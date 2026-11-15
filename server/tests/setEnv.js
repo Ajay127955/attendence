@@ -15,7 +15,5 @@ process.env.COOKIE_SECURE = 'false';
 process.env.COOKIE_SAME_SITE = 'lax';
 process.env.RATE_LIMIT_MAX = '100000';
 process.env.AUTH_RATE_LIMIT_MAX = '100000';
-process.env.SEED_ADMIN_PASSWORD = 'Admin@12345';
-process.env.SEED_TEACHER_PASSWORD = 'Teacher@12345';
 process.env.SEED_STUDENT_PASSWORD = 'Student@12345';
 process.env.GOOGLE_SHEETS_ENABLED = 'false';

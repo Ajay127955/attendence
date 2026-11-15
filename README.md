@@ -151,8 +151,8 @@ attendance-management-system/
 │   │   ├── validators/         # Zod schemas
 │   │   ├── utils/              # tokens, dates, csv, mailer, cookies, pagination…
 │   │   ├── realtime/           # Socket.IO
-│   │   ├── seed/               # demo data generator
 │   │   ├── app.js · server.js
+│   ├── scripts/                # create-admin, local dev database
 │   ├── tests/                  # Jest + Supertest
 │   ├── Dockerfile
 │   └── .env.example
@@ -210,12 +210,17 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 > `mongodb-memory-server` already caches for the test suite, and keeps your data
 > between restarts.
 
-### 3. Seed demo data
+### 3. Create an admin account
+
+The app has **no public sign-up** — accounts are created by an admin. Bootstrap the
+very first admin from the command line:
 
 ```bash
-npm run seed          # creates 1 admin, 3 teachers, 2 classes, 3 subjects, 40 students, 30 days of attendance
-npm run seed:destroy  # wipe everything
+npm run create-admin -- --email admin@yourschool.edu --name "Principal" --password "Str0ng@Pass"
 ```
+
+Running it again with the same email updates that admin's name/password, so it is
+safe to re-run if you forget the credentials.
 
 ### 4. Start the API
 
@@ -232,7 +237,7 @@ npm install
 npm run dev           # http://localhost:5173
 ```
 
-Open <http://localhost:5173> and sign in with a demo account below.
+Open <http://localhost:5173> and sign in with the admin account you created above.
 
 > **📱 Testing on your phone?** Run the server as a single-origin host
 > (`SERVE_CLIENT=true`, `CLIENT_BASE_PATH=/attendence/`), run **`share-lan.cmd`
@@ -243,16 +248,18 @@ Open <http://localhost:5173> and sign in with a demo account below.
 
 ---
 
-## 🔑 Demo Credentials
+## 🔑 Accounts & Roles
 
-| Role | Identifier | Password |
+There is **no public sign-up**. An admin creates every other account:
+
+| Role | Created from | Sign-in identifier |
 | --- | --- | --- |
-| **Admin** | `admin@ams.dev` | `Admin@12345` |
-| **Teacher** | `priya.menon@ams.dev` | `Teacher@12345` |
-| **Student** | `S0001` *(or the student's email)* | `Student@12345` |
+| **Admin** | `npm run create-admin` (or `POST /auth/register` while signed in as an admin) | email |
+| **Teacher** | Admin → **Teachers** → *Add teacher* | email |
+| **Student** | Admin → **Students** → *Add student* or *Import CSV* | roll number **or** email |
 
-> Students can log in with **either their roll number or email**.
-> Change these via `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_TEACHER_PASSWORD`, `SEED_STUDENT_PASSWORD` in `.env`.
+> New student accounts without an explicit password receive the value of
+> `SEED_STUDENT_PASSWORD` from `.env` — set a strong value there in production.
 
 ---
 
@@ -271,7 +278,7 @@ Open <http://localhost:5173> and sign in with a demo account below.
 | `COOKIE_DOMAIN` / `COOKIE_SECURE` / `COOKIE_SAME_SITE` | Cookie scope (see deployment) |
 | `RATE_LIMIT_WINDOW_MINUTES`, `RATE_LIMIT_MAX`, `AUTH_RATE_LIMIT_MAX` | Rate-limit tuning |
 | `SMTP_*`, `MAIL_FROM` | Email for password resets (omit `SMTP_HOST` to log links to console) |
-| `SEED_*` | Demo credentials used by `npm run seed` |
+| `SEED_STUDENT_PASSWORD` | Default password for newly created/imported student accounts |
 | `GOOGLE_SHEETS_ENABLED`, `GOOGLE_SHEETS_ID`, `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY` | Optional Sheets sync |
 
 ### `client/.env`
@@ -400,10 +407,10 @@ docker compose up --build
 The client's Nginx proxies `/api` and `/socket.io` to the API container, so the browser stays on a
 single origin and cookies work without extra CORS configuration.
 
-Seed inside the container:
+Create an admin inside the container:
 
 ```bash
-docker compose exec server npm run seed
+docker compose exec server npm run create-admin -- --email admin@yourschool.edu --name "Principal" --password "Str0ng@Pass"
 ```
 
 ---
@@ -446,7 +453,7 @@ CORS_ORIGINS=https://app.yourdomain.com
 Both domains must be **HTTPS** for `SameSite=None; Secure` to work.
 
 ### 5. Post-deploy
-- Seed demo data: `npm run seed` (or create your first admin through `/auth/register`).
+- Create your first admin: `npm run create-admin` (see [step 3](#3-create-an-admin-account)).
 - Verify `GET https://api.yourdomain.com/health` returns `200`.
 - Browse `https://api.yourdomain.com/api/docs` to confirm the API is live.
 
@@ -470,7 +477,7 @@ Both domains must be **HTTPS** for `SameSite=None; Secure` to work.
 | `npm run dev` | Start with nodemon |
 | `npm start` | Start in production |
 | `npm run db` | Start a local MongoDB (no install needed) |
-| `npm run seed` / `seed:destroy` | Create / wipe demo data |
+| `npm run create-admin` | Create/update an admin account |
 | `npm test` | Jest + Supertest |
 | `npm run lint` / `lint:fix` | ESLint |
 

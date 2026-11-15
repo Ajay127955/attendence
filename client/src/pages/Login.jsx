@@ -6,12 +6,6 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Button, Input } from '../components/ui';
 
-const DEMO = [
-  { role: 'Admin', id: 'admin@ams.dev', pw: 'Admin@12345' },
-  { role: 'Teacher', id: 'priya.menon@ams.dev', pw: 'Teacher@12345' },
-  { role: 'Student', id: 'S0001', pw: 'Student@12345' },
-];
-
 export default function Login() {
   const { login, isAuthenticated, loading } = useAuth();
   const { theme, toggle } = useTheme();
@@ -48,11 +42,6 @@ export default function Login() {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const fillDemo = (d) => {
-    setForm({ identifier: d.id, password: d.pw });
-    setErrors({});
   };
 
   return (
@@ -132,7 +121,7 @@ export default function Login() {
                 name="identifier"
                 autoComplete="username"
                 autoFocus
-                placeholder="admin@ams.dev"
+                placeholder="you@example.com"
                 value={form.identifier}
                 onChange={(e) => setForm({ ...form, identifier: e.target.value })}
                 error={errors.identifier}
@@ -171,26 +160,6 @@ export default function Login() {
               <Lock size={16} /> Sign in
             </Button>
           </form>
-
-          <div className="mt-8 rounded-2xl border border-dashed border-ink-300 p-4 dark:border-ink-700">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-500 dark:text-ink-400">
-              Demo accounts — tap to fill
-            </p>
-            <div className="grid gap-2">
-              {DEMO.map((d) => (
-                <button
-                  key={d.role}
-                  type="button"
-                  onClick={() => fillDemo(d)}
-                  className="flex items-center justify-between rounded-xl border border-ink-200 px-3 py-2 text-left text-xs transition hover:bg-ink-100 dark:border-ink-800 dark:hover:bg-ink-800"
-                >
-                  <span className="font-semibold">{d.role}</span>
-                  <span className="font-mono text-ink-500 dark:text-ink-400">{d.id}</span>
-                </button>
-              ))}
-            </div>
-            <p className="mt-2 text-[11px] text-ink-400">Requires the seed script: <code className="font-mono">npm run seed</code></p>
-          </div>
         </div>
       </div>
     </div>

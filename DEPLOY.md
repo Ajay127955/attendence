@@ -1,25 +1,38 @@
 # Deploying to `https://codestorm.dpdns.org/attendence/`
 
-A free, single-origin deployment: **one public link** that serves both the app
-and its API, so there is no CORS setup and no cross-site cookie problems.
+A free deployment that puts the app on the same domain as your portfolio, with the
+API reached through a **same-origin rewrite** — so login cookies work, there is no
+CORS setup, and no subdomain or extra DNS record is needed.
 
 ```
-https://codestorm.dpdns.org/attendence/        →  the React app
-https://codestorm.dpdns.org/api/v1             →  the REST API
-https://codestorm.dpdns.org/api/docs           →  Swagger docs
+https://codestorm.dpdns.org/                 →  portfolio (homepage)
+https://codestorm.dpdns.org/attendence/      →  the React app
+https://codestorm.dpdns.org/ams/api/v1       →  the REST API   (rewritten to Render)
+https://codestorm.dpdns.org/socket.io        →  realtime       (rewritten to Render)
 ```
 
 | Piece | Free service | What it does |
 | --- | --- | --- |
-| App + API | **Render** (free Web Service) | Express serves the built SPA at `/attendence/` and the API at `/api/v1` |
-| Database | **MongoDB Atlas** (M0, free) | Stores users, students, classes, attendance |
-| Domain | **DigitalPlat FreeDomain** (`dpdns.org`) | Your `codestorm.dpdns.org` subdomain |
-| TLS | Render (automatic) | HTTPS certificate for the custom domain |
+| Portfolio | **Vercel** | Homepage at `/`; `vercel.json` rewrites `/ams/*` and `/socket.io` to the API |
+| App SPA | **Vercel** | Serves the built React app from `/attendence/` |
+| API + realtime | **Render** (free Web Service) | Express API + Socket.IO |
+| Database | **MongoDB Atlas** (M0, free) | Users, students, classes, attendance |
+| Domain | **DigitalPlat FreeDomain** (`dpdns.org`) | `codestorm.dpdns.org` (points at Vercel) |
+| TLS | Vercel / Render (automatic) | HTTPS on both ends |
 
 > **Free-tier note:** Render's free Web Service sleeps after ~15 minutes idle and
-> takes ~50 seconds to wake. For a portfolio link you can keep it warm for free
-> with [UptimeRobot](https://uptimerobot.com) pinging `https://codestorm.dpdns.org/health`
-> every 10 minutes. *(Prefer a site that never sleeps? See [Alternative A](#alternative-a-static-spa--api).)*
+> takes ~50 seconds to wake. Keep it warm for free with
+> [UptimeRobot](https://uptimerobot.com) pinging
+> `https://codestorm.dpdns.org/ams/api/health` every 10 minutes.
+>
+> **Why the `/ams` prefix, not `/api`?** The portfolio project contains an `api/`
+> serverless-functions folder, so Vercel reserves the whole `/api` prefix and
+> refuses to rewrite it to an external host (requests there return a Vercel 404).
+> `/ams/*` is free to use.
+>
+> **Why polling for the socket?** Vercel does not forward WebSocket upgrades for
+> external rewrites, so the client is configured with `transports: ['polling']`.
+> Real-time updates still work.
 
 ---
 
@@ -37,9 +50,6 @@ git push -u origin main
 ```
 
 `.env` files and `dist/` are already git-ignored, so no secrets are committed.
-
-> Name the repo **`attendence`** if you plan to also use GitHub Pages
-> (Alternative A), because that becomes the URL path.
 
 ---
 
@@ -59,13 +69,13 @@ git push -u origin main
 
 ---
 
-## Step 2 — Deploy the server + app on Render (free)
+## Step 2 — Deploy the API on Render (free)
 
 > **Fastest path (Blueprint):** the repo already contains **`render.yaml`**.
 > In Render choose **New → Blueprint**, pick your `attendence` repo, and Render
-> creates the service and pre-fills everything below. You only type the two
-> prompted secrets (`MONGODB_URI` and the three `SEED_*` passwords). Skip to
-> [Step 3](#step-3--point-your-domain-at-render) once it finishes building.
+> creates the service and pre-fills everything below. You only type the value
+> marked `sync: false` (`MONGODB_URI`). Skip to
+> [Step 3](#step-3--create-your-first-admin-account) once it finishes building.
 > The manual steps below are the equivalent if you'd rather do it by hand.
 
 1. Sign up at <https://render.com> with your GitHub account.
@@ -94,21 +104,17 @@ git push -u origin main
    | `MONGODB_URI` | *(the Atlas string from Step 1)* |
    | `JWT_ACCESS_SECRET` | *(48-byte random hex)* |
    | `JWT_REFRESH_SECRET` | *(a different 48-byte random hex)* |
-   | `CLIENT_URL` | `https://codestorm.dpdns.org` |
+   | `CLIENT_URL` | `https://codestorm.dpdns.org/attendence` |
    | `CORS_ORIGINS` | `https://codestorm.dpdns.org` |
-   | `SERVE_CLIENT` | `true` |
-   | `CLIENT_BASE_PATH` | `/attendence/` |
-   | `VITE_BASE_PATH` | `/attendence/` |
    | `COOKIE_SECURE` | `true` |
    | `COOKIE_SAME_SITE` | `lax` |
    | `COOKIE_DOMAIN` | *(leave empty)* |
-   | `SEED_ADMIN_EMAIL` | `admin@ams.dev` |
-   | `SEED_ADMIN_PASSWORD` | *(choose a strong password)* |
-   | `SEED_TEACHER_PASSWORD` | *(choose a strong password)* |
-   | `SEED_STUDENT_PASSWORD` | *(choose a strong password)* |
+   | `SEED_STUDENT_PASSWORD` | *(default password for new/imported students)* |
 
-   > `VITE_BASE_PATH` is read at **build time**, so it must be set before the
-   > first deploy. `VITE_API_URL` must stay **unset** — the API is same-origin.
+   > `VITE_BASE_PATH` is read at **build time** by Vite. The Render build above is
+   > only a fallback copy of the SPA — the real app is served by Vercel
+   > (Step 4) — so you can leave it at the default. `VITE_API_URL` must stay
+   > **unset**: the API is same-origin through the portfolio rewrite.
    > Leave `SMTP_*` and `GOOGLE_*` blank unless you want those features.
    >
    > **Why `--include=dev` in the build command?** Render injects your
@@ -117,69 +123,118 @@ git push -u origin main
    > is where Vite and Tailwind live, failing the client build. `--include=dev`
    > forces them in for the build only; `--omit=dev` keeps the server install lean.
 
-5. **Create Web Service**. Wait for the build to finish, then open the
-   `*.onrender.com` URL — you should see the app at `/attendence/`.
+5. **Create Web Service**. Wait for the build to finish, then confirm the API is
+   up at `https://<your-service>.onrender.com/health`.
 
-6. **Seed the demo data**, either:
-
-   - **In Render:** open your service → **Shell** tab and run:
-
-     ```bash
-     cd server && npm run seed
-     ```
-
-   - **From your own machine** (works even if the Shell tab is unavailable on
-     the free tier) — point it at the Atlas database:
-
-     ```powershell
-     cd server
-     $env:MONGODB_URI="mongodb+srv://ams_user:YOUR_PASSWORD@cluster0.xxxxx.mongodb.net/attendance_ams?retryWrites=true&w=majority"
-     $env:SEED_ADMIN_PASSWORD="Admin@12345"; $env:SEED_TEACHER_PASSWORD="Teacher@12345"; $env:SEED_STUDENT_PASSWORD="Student@12345"
-     npm run seed
-     ```
-
-   Either way it prints the demo credentials. (Run it only once — it clears
-   collections.)
+> **No custom domain on Render.** The portfolio proxies `/ams/*` to this
+> service's `*.onrender.com` hostname, so Render never needs a domain or TLS
+> certificate of its own.
 
 ---
 
-## Step 3 — Point your domain at Render
+## Step 3 — Create your first admin account
 
-1. In Render → your service → **Settings** → **Custom Domains** → **Add**:
-   enter `codestorm.dpdns.org`. Render shows a target hostname like
-   `ams-xxxx.onrender.com`.
-2. Add the DNS record at your DNS provider:
+There is no public sign-up — accounts are created by an admin. Bootstrap the very
+first admin by pointing the script at your Atlas database from your machine:
+
+```powershell
+cd server
+$env:MONGODB_URI="mongodb+srv://ams_user:YOUR_PASSWORD@cluster0.xxxxx.mongodb.net/attendance_ams?retryWrites=true&w=majority"
+npm run create-admin -- --email admin@yourschool.edu --name "Principal" --password "Str0ng@Pass"
+```
+
+(Render's **Shell** tab works too, if it is available on your plan:
+`cd server && npm run create-admin -- --email … --password …`.)
+
+Running it again with the same email updates that admin's name/password, so it is
+safe to re-run if you forget the credentials. Log in to the app and add teachers
+and students from there.
+
+---
+
+## Step 4 — Build the app and publish it with the portfolio (Vercel)
+
+The app is a static build that lives inside your portfolio site at
+`/attendence/`, and reaches the API through the portfolio's `/ams/*` rewrite.
+
+1. Build the client with the subfolder base path and the proxied API URL:
+
+   ```powershell
+   cd client
+   $env:VITE_BASE_PATH="/attendence/"
+   $env:VITE_API_URL="/ams/api/v1"
+   npm ci
+   npm run build
+   ```
+
+2. Copy the build into your portfolio's public folder, replacing the old copy:
+
+   ```powershell
+   Remove-Item -Recurse -Force "<portfolio>\public\attendence" -ErrorAction SilentlyContinue
+   Copy-Item -Recurse client\dist "<portfolio>\public\attendence"
+   # GitHub Pages helpers are not used here:
+   Remove-Item "<portfolio>\public\attendence\CNAME","<portfolio>\public\attendence\404.html" -ErrorAction SilentlyContinue
+   ```
+
+3. Make sure the portfolio's `vercel.json` contains the rewrites (already the
+   case for this project):
+
+   ```json
+   {
+     "rewrites": [
+       { "source": "/attendence", "destination": "/attendence/" },
+       { "source": "/attendence/:path*", "destination": "/attendence/" },
+       { "source": "/ams/:path*", "destination": "https://<your-service>.onrender.com/:path*" },
+       { "source": "/socket.io", "destination": "https://<your-service>.onrender.com/socket.io" },
+       { "source": "/socket.io/(.*)", "destination": "https://<your-service>.onrender.com/socket.io/$1" }
+     ]
+   }
+   ```
+
+4. Deploy the portfolio to production:
+
+   ```powershell
+   cd "<portfolio>"
+   npx --yes vercel@latest --prod --yes
+   ```
+
+---
+
+## Step 5 — Point your domain at Vercel
+
+`codestorm.dpdns.org` points at **Vercel** (which serves both the portfolio and
+the app), not at Render.
+
+1. In Vercel → your portfolio project → **Settings → Domains**, add
+   `codestorm.dpdns.org`.
+2. Add the DNS record at your DNS provider (DigitalPlat / Cloudflare):
 
    | Type | Name | Value | TTL |
    | --- | --- | --- | --- |
-   | `CNAME` | `codestorm` | `ams-xxxx.onrender.com` | Auto / 300 |
+   | `A` | `@` (or `codestorm`) | `76.76.21.21` | Auto / 300 |
 
-   - **If DigitalPlat gives you a DNS panel**, add the CNAME there directly.
-   - **If DigitalPlat delegates nameservers**, point the NS records at your DNS
-     provider (e.g. Cloudflare) first, then add the CNAME there. On Cloudflare,
-     set the record to **DNS only** (grey cloud) so Render can issue the TLS
-     certificate.
-
-3. Wait for DNS to propagate (a few minutes). Render then provisions HTTPS
-   automatically — the domain shows **Certificate: Issued**.
-
-4. Open **<https://codestorm.dpdns.org/attendence/>** 🎉
+   On Cloudflare, set the record to **DNS only** (grey cloud) so Vercel can issue
+   the TLS certificate.
+3. Wait for DNS to propagate (a few minutes). Vercel provisions HTTPS
+   automatically.
 
 ---
 
-## Step 4 — Verify
+## Step 6 — Verify
 
 ```bash
-curl https://codestorm.dpdns.org/health            # {"success":true,...}
-curl https://codestorm.dpdns.org/api/v1/           # {"success":true,...}
+curl https://codestorm.dpdns.org/ams/api/health      # {"success":true,...}
+curl https://codestorm.dpdns.org/attendence/         # the app HTML
 ```
 
 Then in a browser:
 
-- `https://codestorm.dpdns.org/attendence/` → the login screen
-- Log in with the seeded admin, then **reload** — you should stay logged in
+- `https://codestorm.dpdns.org/` → the portfolio; the project card links to the app
+- `https://codestorm.dpdns.org/attendence/` → the login screen (no demo panel)
+- Sign in with the admin from Step 3, then **reload** — you should stay logged in
 - Open `https://codestorm.dpdns.org/attendence/students` directly — deep links work
 - The top-right badge should read **Live** (real-time socket connected)
+- The browser console should be free of errors
 
 ---
 
@@ -224,22 +279,20 @@ The URL is temporary and changes each run.
 
 ---
 
-## Alternative A — Static SPA + API
+## Alternative A — App + API on one Render origin
 
-If you'd rather have the front end on an always-on static host (no cold start)
-and accept a cross-origin API:
+If you'd rather not involve Vercel for the app at all, Render can serve both the
+SPA and the API from a single origin:
 
-- **App**: GitHub Pages, served at `https://codestorm.dpdns.org/attendence/`.
-  The repo already contains `.github/workflows/deploy-pages.yml` and
-  `client/public/404.html` (SPA deep-link fallback) and `client/public/CNAME`.
-  Enable **Settings → Pages → Source: GitHub Actions**, and set repository
-  variables `VITE_BASE_PATH=/attendence/` and
-  `VITE_API_URL=https://<api-host>/api/v1`.
-- **API**: Render/Railway/Fly, with `SERVE_CLIENT=false` and
-  `CORS_ORIGINS=https://codestorm.dpdns.org`. Because the cookie is then
-  cross-site, also set `COOKIE_SECURE=true` and `COOKIE_SAME_SITE=none`.
-  Some browsers block third-party cookies, which can drop the session on reload
-  — that is why the single-origin option above is recommended.
+- Set `SERVE_CLIENT=true`, `CLIENT_BASE_PATH=/attendence/` and
+  `VITE_BASE_PATH=/attendence/` on the service, and leave `VITE_API_URL` unset.
+- Add `codestorm.dpdns.org` as a **Custom Domain** in Render and point the DNS
+  record at the Render hostname instead of Vercel.
+- Then the app is at `https://codestorm.dpdns.org/attendence/` and the API at
+  `https://codestorm.dpdns.org/api/v1` on the same origin — no rewrite needed.
+
+The trade-off is that the app then sleeps with the free Render instance, whereas
+hosting the SPA on Vercel keeps the page itself always-on.
 
 ## Alternative B — Your own VPS (Docker + Nginx)
 
@@ -254,9 +307,10 @@ the static build.
 
 | Symptom | Cause / fix |
 | --- | --- |
-| Blank page, assets 404 | `VITE_BASE_PATH` was not `/attendence/` at build time — set it and **redeploy**. |
-| `/attendence/` returns JSON 404 | `SERVE_CLIENT` is not `true`, or the client build is missing. |
+| Blank page, assets 404 | `VITE_BASE_PATH` was not `/attendence/` at build time — rebuild and redeploy the portfolio. |
+| `/attendence/` returns JSON 404 | The portfolio rewrite is missing, or `public/attendence/index.html` was not copied. |
+| `/ams/...` returns a Vercel 404 | The rewrite destination host is wrong, or you used `/api/*` (reserved by Vercel). |
 | Health check failing | `MONGODB_URI` wrong, or Atlas IP allow-list doesn't include `0.0.0.0/0`. |
-| Logged out on every reload | Cookies blocked — ensure `COOKIE_SECURE=true` and the site is served over HTTPS on one origin. |
-| CORS error in console | `CORS_ORIGINS` must exactly match the browser origin, including `https://`. |
+| Logged out on every reload | Cookies blocked — ensure the site is served over HTTPS on one origin and `COOKIE_SECURE=true`. |
+| "Live" badge never turns on | Vercel does not forward WebSocket upgrades; the client must use `transports: ['polling']`. |
 | First load very slow | Render free tier waking up — expected; keep it warm with a pinger. |

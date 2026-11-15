@@ -11,8 +11,7 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "db": "node scripts/dev-db.js",
-    "seed": "node src/seed/index.js",
-    "seed:destroy": "node src/seed/index.js --destroy",
+    "create-admin": "node scripts/create-admin.js",
     "test": "cross-env NODE_ENV=test jest --runInBand --forceExit --detectOpenHandles",
     "test:watch": "cross-env NODE_ENV=test jest --watch --runInBand",
     "lint": "eslint src tests",
@@ -64,7 +63,6 @@
     "collectCoverageFrom": [
       "src/**/*.js",
       "!src/server.js",
-      "!src/seed/**",
       "!src/config/swagger.js"
     ]
   }

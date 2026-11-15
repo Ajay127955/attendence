@@ -55,9 +55,8 @@ const schema = z.object({
   SMTP_PASS: z.string().optional().default(''),
   MAIL_FROM: z.string().default('AMS <no-reply@ams.dev>'),
 
-  SEED_ADMIN_EMAIL: z.string().default('admin@ams.dev'),
-  SEED_ADMIN_PASSWORD: z.string().default('Admin@12345'),
-  SEED_TEACHER_PASSWORD: z.string().default('Teacher@12345'),
+  // Default password assigned to student accounts created without one
+  // (added by hand or imported from CSV). Set a strong value in production.
   SEED_STUDENT_PASSWORD: z.string().default('Student@12345'),
 
   GOOGLE_SHEETS_ENABLED: bool(false),
